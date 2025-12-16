@@ -62,6 +62,16 @@ def check_depression_alert(df):
 # --- 3. UI & Main App ---
 def main():
     st.set_page_config(page_title="Mood Tracker", page_icon="🧠")
+    
+    hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+    st.markdown(hide_st_style, unsafe_allow_html=True)
+
     st.title("🌱 Mood Tracker")
 
     # Connect to DB
