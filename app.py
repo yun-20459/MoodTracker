@@ -99,6 +99,8 @@ def main():
     if "token" not in st.session_state:
         # Show Login Button
         result = oauth2.authorize_button("Continue with Google", redirect_uri, SCOPE)
+        if result:
+            st.write("Debug Info:", result)
         if result and "token" in result:
             st.session_state.token = result.get("token")
             st.rerun()
