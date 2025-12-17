@@ -2,4 +2,6 @@ streamlit
 gspread
 pandas
 plotly
-streamlit-oauth>=0.0.6
+google-auth-oauthlib
+google-auth
+requests
