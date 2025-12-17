@@ -83,7 +83,7 @@ def main():
 
     st.title("🌱 Mood Tracker")
 
-    # --- AUTHENTICATION FLOW ---
+    # --- AUTHENTICATION FLOW (Final Clean Version) ---
     if "oauth" not in st.secrets:
         st.error("Missing OAuth secrets in .streamlit/secrets.toml")
         st.stop()
@@ -99,32 +99,30 @@ def main():
     if "token" not in st.session_state:
         # Show Login Button
         result = oauth2.authorize_button("Continue with Google", redirect_uri, SCOPE)
-        if result:
-            print("🛑 RETURNED RESULT:", result)
+        
         if result and "token" in result:
             st.session_state.token = result.get("token")
             st.rerun()
         else:
             st.info("Please log in to track your mood privately.")
-            st.stop() # Stop here if not logged in
+            st.stop()
 
     # If logged in, get user email
     if "token" in st.session_state:
         try:
-            # Fetch user info from Google
-            user_info = st.session_state.get("user_info")
-            if not user_info:
+            if "user_info" not in st.session_state:
                 headers = {"Authorization": f"Bearer {st.session_state.token['access_token']}"}
                 r = oauth2.get(USER_INFO_URL, headers=headers)
                 st.session_state.user_info = r.json()
             
             user_email = st.session_state.user_info.get("email")
-            st.caption(f"Logged in as: {user_email}")
+            st.success(f"👋 Welcome back, {user_email}!")
             
             # Logout Button
             if st.button("Logout"):
                 del st.session_state.token
-                del st.session_state.user_info
+                if "user_info" in st.session_state:
+                    del st.session_state.user_info
                 st.rerun()
                 
         except Exception as e:
