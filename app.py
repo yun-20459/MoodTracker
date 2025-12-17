@@ -100,7 +100,7 @@ def main():
         # Show Login Button
         result = oauth2.authorize_button("Continue with Google", redirect_uri, SCOPE)
         if result:
-            st.write("Debug Info:", result)
+            print("🛑 RETURNED RESULT:", result)
         if result and "token" in result:
             st.session_state.token = result.get("token")
             st.rerun()
