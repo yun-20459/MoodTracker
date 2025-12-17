@@ -98,13 +98,13 @@ def main():
     # Check if user is logged in
     if "token" not in st.session_state:
         # Show Login Button
-        result = oauth2.authorize_button("Continue with Google", redirect_uri, SCOPE)
+        result = oauth2.authorize_button("Continue with Google", redirect_uri, SCOPE, key="google_auth")
         
         if result and "token" in result:
             st.session_state.token = result.get("token")
             st.rerun()
         else:
-            st.info("Please log in to track your mood privately.")
+            st.caption("Waiting for login...")
             st.stop()
 
     # If logged in, get user email
