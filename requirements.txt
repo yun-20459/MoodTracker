@@ -2,4 +2,4 @@ streamlit
 gspread
 pandas
 plotly
-streamlit-oauth
+streamlit-oauth>=0.0.6
