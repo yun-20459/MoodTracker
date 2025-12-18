@@ -59,7 +59,6 @@ def main():
     # --- 🛠️ MANUAL AUTH FLOW (The Robust Way) ---
     if "user_email" not in st.session_state:
         
-        # 準備 Google OAuth 設定
         client_config = {
             "web": {
                 "client_id": st.secrets["oauth"]["client_id"],
@@ -136,68 +135,70 @@ def main():
     tab1, tab2 = st.tabs(["📝 Check-in", "📊 Insights"])
 
     with tab1:
-        with st.form("bsrs5_form"):
-            st.subheader("📝 今日心情檢核")
-            st.caption("請回想最近一週（包含今天）的身心狀況：")
-            
-            # 日期選擇
-            col_date, _ = st.columns([2, 1])
-            with col_date:
-                date_val = st.date_input("日期", datetime.now())
-            
-            st.divider()
-            
-            # 定義中文選項
-            opts_map = {
-                "0: 完全沒有": 0, 
-                "1: 輕微": 1, 
-                "2: 中等": 2, 
-                "3: 厲害": 3, 
-                "4: 非常厲害": 4
-            }
-            opts = list(opts_map.keys())
-            
-            # 這裡把問題用 markdown 寫出來，字體比較大，手機比較好讀
-            # label_visibility="collapsed" 是為了不讓滑桿重複顯示一次標題
-            
-            st.markdown("##### 1. 睡眠困難 (難入睡/易醒/早醒)")
-            q1 = st.select_slider("Sleep", opts, label_visibility="collapsed")
-            
-            st.markdown("##### 2. 感覺緊張不安")
-            q2 = st.select_slider("Tense", opts, label_visibility="collapsed")
-            
-            st.markdown("##### 3. 覺得容易苦惱或動怒")
-            q3 = st.select_slider("Irritated", opts, label_visibility="collapsed")
-            
-            st.markdown("##### 4. 感覺憂鬱、心情低落")
-            q4 = st.select_slider("Blue", opts, label_visibility="collapsed")
-            
-            st.markdown("##### 5. 覺得比不上別人")
-            q5 = st.select_slider("Inferior", opts, label_visibility="collapsed")
-            
-            # 計算分數
-            score = sum([opts_map[q] for q in [q1, q2, q3, q4, q5]])
-            
-            # 即時顯示分數與評語
-            st.info(f"當前總分：{score} / 20")
+        st.subheader("📝 今日心情檢核")
+        st.caption("請回想最近一週（包含今天）的身心狀況：")
+        
+        col_date, _ = st.columns([2, 1])
+        with col_date:
+            date_val = st.date_input("日期", datetime.now())
+        
+        st.divider()
+        
+        opts_map = {
+            "0: 完全沒有": 0, 
+            "1: 輕微": 1, 
+            "2: 中等": 2, 
+            "3: 厲害": 3, 
+            "4: 非常厲害": 4
+        }
+        opts = list(opts_map.keys())
+        
+        st.markdown("##### 1. 睡眠困難 (難入睡/易醒/早醒)")
+        q1 = st.select_slider("Sleep", opts, label_visibility="collapsed")
+        
+        st.markdown("##### 2. 感覺緊張不安")
+        q2 = st.select_slider("Tense", opts, label_visibility="collapsed")
+        
+        st.markdown("##### 3. 覺得容易苦惱或動怒")
+        q3 = st.select_slider("Irritated", opts, label_visibility="collapsed")
+        
+        st.markdown("##### 4. 感覺憂鬱、心情低落")
+        q4 = st.select_slider("Blue", opts, label_visibility="collapsed")
+        
+        st.markdown("##### 5. 覺得比不上別人")
+        q5 = st.select_slider("Inferior", opts, label_visibility="collapsed")
+        
+        score = sum([opts_map[q] for q in [q1, q2, q3, q4, q5]])
+        
+        if score < 6:
+            st.success(f"😊 當前總分：{score} / 20 (狀況不錯)")
+        elif score < 10:
+            st.info(f"😐 當前總分：{score} / 20 (輕度困擾)")
+        elif score < 15:
+            st.warning(f"😟 當前總分：{score} / 20 (中度困擾)")
+        else:
+            st.error(f"🚨 當前總分：{score} / 20 (嚴重困擾，請多保重)")
 
-            st.divider()
-            
-            # 標籤與筆記
-            tags = st.multiselect("影響心情的因素 (Tags)", 
-                ["🩸 生理期/經前", "😴 沒睡好", "💊 忘記吃藥", 
-                 "🤕 身體不舒服", "🤯 工作壓力", "👥 人際衝突", 
-                 "🌧️ 天氣不好", "😰 莫名焦慮", "😶 無動力/空虛",
-                 "🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會"])
-            
-            note = st.text_area("一句話日記 (Note)", placeholder="今天發生了什麼小事？")
-            
-            # 送出按鈕
-            if st.form_submit_button("💾 儲存紀錄 (Save Entry)", use_container_width=True):
-                # 這裡記得要用 str(date_val) 轉成文字存
+        st.divider()
+        
+        tags = st.multiselect("影響心情的因素 (Tags)", 
+            ["🩸 生理期/經前", "😴 沒睡好", "💊 忘記吃藥", 
+                "🤕 身體不舒服", "🤯 工作壓力", "👥 人際衝突", 
+                "🌧️ 天氣不好", "😰 莫名焦慮", "😶 無動力/空虛",
+                "🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會"])
+        
+        note = st.text_area("一句話日記 (Note)", placeholder="今天發生了什麼小事？")
+        
+        if st.button("💾 儲存紀錄 (Save Entry)", type="primary", use_container_width=True):
+            if not user_email:
+                st.error("請先登入")
+            else:
                 sheet.append_row([user_email, str(date_val), score, ", ".join(tags), note])
-                st.success("✅ 紀錄已儲存！")
+                st.toast("✅ 紀錄已儲存！", icon="🎉")
                 st.cache_data.clear()
+                import time
+                time.sleep(1)
+                st.rerun()
 
         # Instant Stats
         raw = sheet.get_all_records()
