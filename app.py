@@ -30,6 +30,24 @@ def analyze_user_data(df, user_email):
     df['Date'] = pd.to_datetime(df['Date'])
     return df.sort_values(by='Date')
 
+def get_tag_correlations(df):
+    # Filter out empty tags
+    tag_df = df[df['Tags'] != ""].copy()
+    
+    # Split tags by comma (since we stored them as "Tag1, Tag2")
+    tag_df['Tags'] = tag_df['Tags'].astype(str).str.split(', ')
+    
+    # Explode the list so each tag gets its own row
+    tag_df = tag_df.explode('Tags')
+    
+    if tag_df.empty: return pd.DataFrame()
+    
+    # Group by Tag and calculate average score and count
+    stats = tag_df.groupby('Tags')['Score'].agg(['mean', 'count']).reset_index()
+    
+    # Sort by average score (highest stress first)
+    return stats.sort_values(by='mean', ascending=False)
+
 def get_weekly_comparison(df):
     if df.empty: return None, None
     today = datetime.now()
@@ -213,13 +231,55 @@ def main():
 
     with tab2:
         if raw:
+            # Convert raw data to DataFrame
             df = analyze_user_data(pd.DataFrame(raw), user_email)
+            
             if not df.empty:
-                fig = px.line(df, x="Date", y="Score", markers=True, title="Mood Trend")
-                fig.update_layout(yaxis_range=[0, 21]) 
-                st.plotly_chart(fig)
+                # 1. Trend Chart (Existing)
+                st.subheader("📈 Mood Trend")
+                fig_trend = px.line(df, x="Date", y="Score", markers=True, title="Mood Score Over Time")
+                fig_trend.update_layout(yaxis_range=[0, 21]) 
+                st.plotly_chart(fig_trend, use_container_width=True)
+                
+                st.divider()
+
+                # 2. Tag Correlation Analysis (NEW!)
+                st.subheader("🔍 What affects your mood?")
+                
+                # Calculate stats
+                tag_stats = get_tag_correlations(df)
+                
+                if not tag_stats.empty:
+                    # Create a Bar Chart
+                    # X: Average Score, Y: Tag Name
+                    fig_tags = px.bar(
+                        tag_stats, 
+                        x="mean", 
+                        y="Tags", 
+                        orientation='h', # Horizontal bar chart is easier to read
+                        title="Average Mood Score by Tag (Higher = Worse)",
+                        labels={"mean": "Avg Score", "Tags": "Tag"},
+                        text="mean",
+                        color="mean", # Color by severity
+                        color_continuous_scale="Reds"
+                    )
+                    
+                    # Formatting
+                    fig_tags.update_traces(texttemplate='%{text:.1f}', textposition='outside')
+                    fig_tags.update_layout(yaxis={'categoryorder':'total ascending'}) # Sort bars
+                    
+                    st.plotly_chart(fig_tags, use_container_width=True)
+                    
+                    # Show detail table (optional)
+                    with st.expander("See detailed statistics"):
+                        st.dataframe(tag_stats.rename(columns={"mean": "Avg Score", "count": "Frequency"}), use_container_width=True)
+                else:
+                    st.info("No tags recorded yet. Try adding tags to your entries!")
+            
             else:
-                st.info("No data yet.")
+                st.info("No data available for this user.")
+        else:
+            st.info("Database is empty.")
 
 if __name__ == "__main__":
     main()
