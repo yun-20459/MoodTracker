@@ -137,29 +137,66 @@ def main():
 
     with tab1:
         with st.form("bsrs5_form"):
-            st.caption("How have you been feeling?")
-            date_val = st.date_input("Date", datetime.now())
+            st.subheader("📝 今日心情檢核")
+            st.caption("請回想最近一週（包含今天）的身心狀況：")
+            
+            # 日期選擇
+            col_date, _ = st.columns([2, 1])
+            with col_date:
+                date_val = st.date_input("日期", datetime.now())
+            
             st.divider()
             
-            opts_map = {"0: None": 0, "1: Mild": 1, "2: Moderate": 2, "3: Severe": 3, "4: Very Severe": 4}
+            # 定義中文選項
+            opts_map = {
+                "0: 完全沒有": 0, 
+                "1: 輕微": 1, 
+                "2: 中等": 2, 
+                "3: 厲害": 3, 
+                "4: 非常厲害": 4
+            }
             opts = list(opts_map.keys())
             
-            q1 = st.select_slider("1. Sleep trouble", opts, label_visibility="collapsed")
-            q2 = st.select_slider("2. Feeling tense", opts, label_visibility="collapsed")
-            q3 = st.select_slider("3. Irritated", opts, label_visibility="collapsed")
-            q4 = st.select_slider("4. Feeling blue", opts, label_visibility="collapsed")
-            q5 = st.select_slider("5. Inferiority", opts, label_visibility="collapsed")
+            # 這裡把問題用 markdown 寫出來，字體比較大，手機比較好讀
+            # label_visibility="collapsed" 是為了不讓滑桿重複顯示一次標題
             
+            st.markdown("##### 1. 睡眠困難 (難入睡/易醒/早醒)")
+            q1 = st.select_slider("Sleep", opts, label_visibility="collapsed")
+            
+            st.markdown("##### 2. 感覺緊張不安")
+            q2 = st.select_slider("Tense", opts, label_visibility="collapsed")
+            
+            st.markdown("##### 3. 覺得容易苦惱或動怒")
+            q3 = st.select_slider("Irritated", opts, label_visibility="collapsed")
+            
+            st.markdown("##### 4. 感覺憂鬱、心情低落")
+            q4 = st.select_slider("Blue", opts, label_visibility="collapsed")
+            
+            st.markdown("##### 5. 覺得比不上別人")
+            q5 = st.select_slider("Inferior", opts, label_visibility="collapsed")
+            
+            # 計算分數
             score = sum([opts_map[q] for q in [q1, q2, q3, q4, q5]])
-            st.markdown(f"**Score: {score} / 20**")
             
+            # 即時顯示分數與評語
+            st.info(f"當前總分：{score} / 20")
+
             st.divider()
-            tags = st.multiselect("Tags", ["🩸 Period", "😴 Poor Sleep", "🤯 Stress", "😰 Anxiety", "😊 Good Day"])
-            note = st.text_area("Note")
             
-            if st.form_submit_button("💾 Save"):
+            # 標籤與筆記
+            tags = st.multiselect("影響心情的因素 (Tags)", 
+                ["🩸 生理期/經前", "😴 沒睡好", "💊 忘記吃藥", 
+                 "🤕 身體不舒服", "🤯 工作壓力", "👥 人際衝突", 
+                 "🌧️ 天氣不好", "😰 莫名焦慮", "😶 無動力/空虛",
+                 "🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會"])
+            
+            note = st.text_area("一句話日記 (Note)", placeholder="今天發生了什麼小事？")
+            
+            # 送出按鈕
+            if st.form_submit_button("💾 儲存紀錄 (Save Entry)", use_container_width=True):
+                # 這裡記得要用 str(date_val) 轉成文字存
                 sheet.append_row([user_email, str(date_val), score, ", ".join(tags), note])
-                st.success("Saved!")
+                st.success("✅ 紀錄已儲存！")
                 st.cache_data.clear()
 
         # Instant Stats
