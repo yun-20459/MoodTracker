@@ -120,14 +120,19 @@ def get_pattern_insights(df):
     if 'Tags' in df_copy.columns:
         tag_stats = get_tag_correlations(df_copy)
         if not tag_stats.empty and len(tag_stats) >= 2:
-            # Find most helpful tag
-            best_tag = tag_stats.iloc[-1]  # Last one (lowest mean score)
-            if best_tag['count'] >= 3:  # Need at least 3 occurrences
-                insights.append({
-                    'type': 'tag_insight',
-                    'icon': '💡',
-                    'text': f"「{best_tag['Tags']}」在你記錄中出現了 {int(best_tag['count'])} 次，平均分數為 {best_tag['mean']:.1f}。這是個好習慣！"
-                })
+            # Define positive tags (protective factors)
+            positive_tags = ["🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會"]
+
+            # Find most helpful positive tag
+            positive_tag_stats = tag_stats[tag_stats['Tags'].isin(positive_tags)]
+            if not positive_tag_stats.empty:
+                best_tag = positive_tag_stats.iloc[-1]  # Last one (lowest mean score among positive tags)
+                if best_tag['count'] >= 3:  # Need at least 3 occurrences
+                    insights.append({
+                        'type': 'tag_insight',
+                        'icon': '💡',
+                        'text': f"「{best_tag['Tags']}」在你記錄中出現了 {int(best_tag['count'])} 次，平均分數為 {best_tag['mean']:.1f}。這是個好習慣！"
+                    })
 
     return insights
 
@@ -379,12 +384,18 @@ def main():
                 tag_stats = get_tag_correlations(df)
 
                 if not tag_stats.empty:
+                    # Define which tags are inherently positive (protective) vs negative (stressors)
+                    positive_tags = ["🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會"]
+                    negative_tags = ["🩸 生理期/經前", "😴 沒睡好", "💊 忘記吃藥",
+                                   "🤕 身體不舒服", "🤯 工作壓力", "👥 人際衝突",
+                                   "🌧️ 天氣不好", "😰 莫名焦慮", "😶 無動力/空虛"]
+
                     # Calculate overall average score for comparison
                     overall_avg = df['Score'].mean()
 
-                    # Separate into stressors and protective factors
-                    stressors = tag_stats[tag_stats['mean'] > overall_avg].sort_values(by='mean', ascending=False)
-                    protective = tag_stats[tag_stats['mean'] <= overall_avg].sort_values(by='mean', ascending=True)
+                    # Separate based on tag category AND score comparison
+                    stressors = tag_stats[tag_stats['Tags'].isin(negative_tags)].sort_values(by='mean', ascending=False)
+                    protective = tag_stats[tag_stats['Tags'].isin(positive_tags)].sort_values(by='mean', ascending=True)
 
                     # Display insights
                     col_stress, col_protect = st.columns(2)
