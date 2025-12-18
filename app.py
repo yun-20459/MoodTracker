@@ -112,6 +112,9 @@ def main():
                         Sign in with Google
                     </button>
                 </a>
+                <p style="font-size: 12px; color: grey; margin-top: 5px;">
+                    (基於安全性考量，登入將會開啟新視窗)
+                </p>
                 ''', unsafe_allow_html=True)
             st.info("🔒 Please log in to access your private journal.")
             st.stop()
