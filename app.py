@@ -103,7 +103,7 @@ def main():
         else:
             auth_url, _ = flow.authorization_url(prompt='consent')
             st.markdown(f'''
-                <a href="{auth_url}" target="_top">
+                <a href="{auth_url}" target="_blank">
                     <button style="
                         background-color: white; color: #333; border: 1px solid #ccc; 
                         padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px;
