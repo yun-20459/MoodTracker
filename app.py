@@ -121,7 +121,9 @@ def get_pattern_insights(df):
         tag_stats = get_tag_correlations(df_copy)
         if not tag_stats.empty and len(tag_stats) >= 2:
             # Define positive tags (protective factors)
-            positive_tags = ["🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會"]
+            positive_tags = ["🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會",
+                           "🎵 聽音樂", "🎨 創作/畫畫", "🚶 散步", "💤 睡眠充足",
+                           "🐾 陪伴寵物", "🧹 整理環境", "👔 準時出門"]
 
             # Find most helpful positive tag
             positive_tag_stats = tag_stats[tag_stats['Tags'].isin(positive_tags)]
@@ -279,11 +281,13 @@ def main():
 
         st.divider()
         
-        tags = st.multiselect("影響心情的因素 (Tags)", 
-            ["🩸 生理期/經前", "😴 沒睡好", "💊 忘記吃藥", 
-                "🤕 身體不舒服", "🤯 工作壓力", "👥 人際衝突", 
+        tags = st.multiselect("影響心情的因素 (Tags)",
+            ["🩸 生理期/經前", "😴 沒睡好", "💊 忘記吃藥",
+                "🤕 身體不舒服", "🤯 工作壓力", "👥 人際衝突",
                 "🌧️ 天氣不好", "😰 莫名焦慮", "😶 無動力/空虛",
-                "🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會"])
+                "🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會",
+                "🎵 聽音樂", "🎨 創作/畫畫", "🚶 散步", "💤 睡眠充足",
+                "🐾 陪伴寵物", "🧹 整理環境", "👔 準時出門"])
         
         note = st.text_area("一句話日記 (Note)", placeholder="今天發生了什麼小事？")
 
@@ -385,7 +389,9 @@ def main():
 
                 if not tag_stats.empty:
                     # Define which tags are inherently positive (protective) vs negative (stressors)
-                    positive_tags = ["🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會"]
+                    positive_tags = ["🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會",
+                                   "🎵 聽音樂", "🎨 創作/畫畫", "🚶 散步", "💤 睡眠充足",
+                                   "🐾 陪伴寵物", "🧹 整理環境", "👔 準時出門"]
                     negative_tags = ["🩸 生理期/經前", "😴 沒睡好", "💊 忘記吃藥",
                                    "🤕 身體不舒服", "🤯 工作壓力", "👥 人際衝突",
                                    "🌧️ 天氣不好", "😰 莫名焦慮", "😶 無動力/空虛"]
