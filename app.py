@@ -206,12 +206,24 @@ def main():
                 "🏃 有運動", "🎮 放鬆/娛樂", "🥰 與朋友聚會"])
         
         note = st.text_area("一句話日記 (Note)", placeholder="今天發生了什麼小事？")
-        
+
+        st.divider()
+
+        # Gratitude & Positive Psychology Section
+        st.markdown("##### 🌟 今日感恩 & 小確幸 (Gratitude & Wins)")
+        st.caption("記錄正向的事物能幫助平衡負面情緒 - 研究證實對憂鬱症有幫助")
+
+        gratitude_1 = st.text_input("1. 今天感謝的一件事", placeholder="例：朋友的一句關心、好吃的一餐、陽光...")
+        gratitude_2 = st.text_input("2. 今天做得不錯的事（再小都可以）", placeholder="例：起床了、洗澡了、回了訊息、出門買東西...")
+        gratitude_3 = st.text_input("3. 今天讓你微笑的瞬間（可選）", placeholder="例：看到可愛的貓、聽到喜歡的歌...", key="gratitude_3")
+
         if st.button("💾 儲存紀錄 (Save Entry)", type="primary", use_container_width=True):
             if not user_email:
                 st.error("請先登入")
             else:
-                sheet.append_row([user_email, str(date_val), score, ", ".join(tags), note])
+                # Combine gratitude entries with separator
+                gratitude_entries = " | ".join([g for g in [gratitude_1, gratitude_2, gratitude_3] if g.strip()])
+                sheet.append_row([user_email, str(date_val), score, ", ".join(tags), note, gratitude_entries])
                 st.toast("✅ 紀錄已儲存！", icon="🎉")
                 st.cache_data.clear()
                 import time
@@ -275,7 +287,44 @@ def main():
                         st.dataframe(tag_stats.rename(columns={"mean": "Avg Score", "count": "Frequency"}), use_container_width=True)
                 else:
                     st.info("No tags recorded yet. Try adding tags to your entries!")
-            
+
+                st.divider()
+
+                # 3. Gratitude Review Section
+                st.subheader("🌟 回顧感恩時刻 (Gratitude Journal)")
+
+                # Check if Gratitude column exists
+                if 'Gratitude' in df.columns:
+                    gratitude_df = df[df['Gratitude'].notna() & (df['Gratitude'] != "")].copy()
+
+                    if not gratitude_df.empty:
+                        # Show recent gratitude entries
+                        st.caption(f"過去 30 天的感恩紀錄 ({len(gratitude_df)} 則)")
+
+                        # Filter last 30 days
+                        recent_gratitude = gratitude_df[gratitude_df['Date'] > (datetime.now() - timedelta(days=30))].sort_values(by='Date', ascending=False)
+
+                        if not recent_gratitude.empty:
+                            for _, row in recent_gratitude.head(10).iterrows():
+                                date_str = row['Date'].strftime('%Y-%m-%d')
+                                gratitude_text = row['Gratitude']
+
+                                # Display each gratitude entry as a card
+                                st.markdown(f"**{date_str}**")
+
+                                # Split by separator and show each item
+                                items = gratitude_text.split(' | ')
+                                for item in items:
+                                    if item.strip():
+                                        st.markdown(f"- {item}")
+                                st.markdown("")  # Add spacing
+                        else:
+                            st.info("最近 30 天沒有感恩紀錄，試著記錄一些正向的事物吧！")
+                    else:
+                        st.info("還沒有感恩紀錄。在「Check-in」頁面開始記錄吧！")
+                else:
+                    st.info("感恩功能已新增！下次記錄時就可以使用了。")
+
             else:
                 st.info("No data available for this user.")
         else:
