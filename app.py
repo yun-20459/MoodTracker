@@ -62,6 +62,75 @@ def get_tag_correlations(df):
     if tag_df.empty: return pd.DataFrame()
     return tag_df.groupby('Tags')['Score'].agg(['mean', 'count']).reset_index().sort_values(by='mean', ascending=False)
 
+def get_pattern_insights(df):
+    """Generate smart insights based on user's mood patterns"""
+    insights = []
+
+    if df.empty or len(df) < 7:
+        return insights
+
+    # Add day of week column
+    df_copy = df.copy()
+    df_copy['DayOfWeek'] = df_copy['Date'].dt.dayofweek
+    df_copy['DayName'] = df_copy['Date'].dt.day_name()
+
+    # 1. Day of week patterns
+    day_stats = df_copy.groupby('DayName')['Score'].agg(['mean', 'count']).reset_index()
+    if len(day_stats) >= 3:  # Need at least 3 different days
+        best_day = day_stats.loc[day_stats['mean'].idxmin()]
+        worst_day = day_stats.loc[day_stats['mean'].idxmax()]
+
+        if worst_day['mean'] - best_day['mean'] >= 2:
+            insights.append({
+                'type': 'day_pattern',
+                'icon': '📅',
+                'text': f"你在 **{worst_day['DayName']}** 時分數通常較高 (平均 {worst_day['mean']:.1f})，而 **{best_day['DayName']}** 時較低 (平均 {best_day['mean']:.1f})。"
+            })
+
+    # 2. Recent trend (last 7 days vs previous 7 days)
+    if len(df_copy) >= 14:
+        recent_7 = df_copy.nlargest(7, 'Date')['Score'].mean()
+        prev_7 = df_copy.nlargest(14, 'Date').nsmallest(7, 'Date')['Score'].mean()
+        diff = recent_7 - prev_7
+
+        if abs(diff) >= 2:
+            if diff > 0:
+                insights.append({
+                    'type': 'trend',
+                    'icon': '📈',
+                    'text': f"最近 7 天你的平均分數比前一週高了 {diff:.1f} 分。記得多照顧自己，必要時尋求支持。"
+                })
+            else:
+                insights.append({
+                    'type': 'trend',
+                    'icon': '📉',
+                    'text': f"最近 7 天你的平均分數比前一週降低了 {abs(diff):.1f} 分。做得好！繼續保持讓你感覺更好的習慣。"
+                })
+
+    # 3. Consecutive high scores warning
+    recent_5 = df_copy.nlargest(5, 'Date').sort_values('Date')
+    if len(recent_5) == 5 and recent_5['Score'].mean() >= 12:
+        insights.append({
+            'type': 'warning',
+            'icon': '⚠️',
+            'text': f"你最近 5 次記錄的平均分數為 {recent_5['Score'].mean():.1f}（中高程度）。如果持續感到困擾，建議尋求專業協助。"
+        })
+
+    # 4. Tag-based insights (if tags exist)
+    if 'Tags' in df_copy.columns:
+        tag_stats = get_tag_correlations(df_copy)
+        if not tag_stats.empty and len(tag_stats) >= 2:
+            # Find most helpful tag
+            best_tag = tag_stats.iloc[-1]  # Last one (lowest mean score)
+            if best_tag['count'] >= 3:  # Need at least 3 occurrences
+                insights.append({
+                    'type': 'tag_insight',
+                    'icon': '💡',
+                    'text': f"「{best_tag['Tags']}」在你記錄中出現了 {int(best_tag['count'])} 次，平均分數為 {best_tag['mean']:.1f}。這是個好習慣！"
+                })
+
+    return insights
+
 # --- 3. Main Application ---
 def main():
     st.set_page_config(page_title="Mood Tracker", page_icon="🧠", layout="centered")
@@ -161,12 +230,18 @@ def main():
             date_val = st.date_input("日期", datetime.now())
         
         st.divider()
-        
+
+        # Medication Adherence Tracker
+        st.markdown("##### 💊 用藥紀錄 (Medication)")
+        med_taken = st.checkbox("✅ 今天有按時服藥", value=True, help="追蹤用藥順從性有助於了解藥物對情緒的影響")
+
+        st.divider()
+
         opts_map = {
-            "0: 完全沒有": 0, 
-            "1: 輕微": 1, 
-            "2: 中等": 2, 
-            "3: 厲害": 3, 
+            "0: 完全沒有": 0,
+            "1: 輕微": 1,
+            "2: 中等": 2,
+            "3: 厲害": 3,
             "4: 非常厲害": 4
         }
         opts = list(opts_map.keys())
@@ -223,7 +298,9 @@ def main():
             else:
                 # Combine gratitude entries with separator
                 gratitude_entries = " | ".join([g for g in [gratitude_1, gratitude_2, gratitude_3] if g.strip()])
-                sheet.append_row([user_email, str(date_val), score, ", ".join(tags), note, gratitude_entries])
+                # Convert medication boolean to string for storage
+                med_status = "Yes" if med_taken else "No"
+                sheet.append_row([user_email, str(date_val), score, ", ".join(tags), note, gratitude_entries, med_status])
                 st.toast("✅ 紀錄已儲存！", icon="🎉")
                 st.cache_data.clear()
                 import time
@@ -245,43 +322,132 @@ def main():
         if raw:
             # Convert raw data to DataFrame
             df = analyze_user_data(pd.DataFrame(raw), user_email)
-            
+
             if not df.empty:
+                # 0. Smart Pattern Insights (NEW!)
+                st.subheader("🧠 智能洞察 (Pattern Insights)")
+                st.caption("基於你的紀錄自動分析出的模式")
+
+                insights = get_pattern_insights(df)
+
+                if insights:
+                    for insight in insights:
+                        if insight['type'] == 'warning':
+                            st.warning(f"{insight['icon']} {insight['text']}")
+                        elif insight['type'] == 'trend' and '降低' in insight['text']:
+                            st.success(f"{insight['icon']} {insight['text']}")
+                        else:
+                            st.info(f"{insight['icon']} {insight['text']}")
+                else:
+                    st.info("繼續記錄幾天後，這裡會顯示個人化的洞察分析！")
+
+                st.divider()
+
                 # 1. Trend Chart (Existing)
                 st.subheader("📈 Mood Trend")
                 fig_trend = px.line(df, x="Date", y="Score", markers=True, title="Mood Score Over Time")
-                fig_trend.update_layout(yaxis_range=[0, 21]) 
+                fig_trend.update_layout(yaxis_range=[0, 21])
                 st.plotly_chart(fig_trend, use_container_width=True)
-                
+
+                # Day of Week Pattern (if enough data)
+                if len(df) >= 7:
+                    df_temp = df.copy()
+                    df_temp['DayOfWeek'] = df_temp['Date'].dt.day_name()
+                    # Order days correctly
+                    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                    day_stats = df_temp.groupby('DayOfWeek')['Score'].mean().reindex(day_order).dropna()
+
+                    if len(day_stats) >= 3:
+                        with st.expander("📅 查看星期分布"):
+                            fig_dow = px.bar(
+                                x=day_stats.index,
+                                y=day_stats.values,
+                                labels={'x': 'Day of Week', 'y': 'Avg Score'},
+                                title="Average Score by Day of Week",
+                                color=day_stats.values,
+                                color_continuous_scale="RdYlGn_r"
+                            )
+                            fig_dow.update_layout(showlegend=False)
+                            st.plotly_chart(fig_dow, use_container_width=True)
+
                 st.divider()
 
-                # 2. Tag Correlation Analysis (NEW!)
+                # 2. Tag Correlation Analysis - Enhanced with Protective Factors
                 st.subheader("🔍 What affects your mood?")
-                
+
                 # Calculate stats
                 tag_stats = get_tag_correlations(df)
-                
+
                 if not tag_stats.empty:
-                    # Create a Bar Chart
-                    # X: Average Score, Y: Tag Name
-                    fig_tags = px.bar(
-                        tag_stats, 
-                        x="mean", 
-                        y="Tags", 
-                        orientation='h', # Horizontal bar chart is easier to read
-                        title="Average Mood Score by Tag (Higher = Worse)",
-                        labels={"mean": "Avg Score", "Tags": "Tag"},
-                        text="mean",
-                        color="mean", # Color by severity
-                        color_continuous_scale="Reds"
-                    )
-                    
-                    # Formatting
-                    fig_tags.update_traces(texttemplate='%{text:.1f}', textposition='outside')
-                    fig_tags.update_layout(yaxis={'categoryorder':'total ascending'}) # Sort bars
-                    
-                    st.plotly_chart(fig_tags, use_container_width=True)
-                    
+                    # Calculate overall average score for comparison
+                    overall_avg = df['Score'].mean()
+
+                    # Separate into stressors and protective factors
+                    stressors = tag_stats[tag_stats['mean'] > overall_avg].sort_values(by='mean', ascending=False)
+                    protective = tag_stats[tag_stats['mean'] <= overall_avg].sort_values(by='mean', ascending=True)
+
+                    # Display insights
+                    col_stress, col_protect = st.columns(2)
+
+                    with col_stress:
+                        st.metric("Overall Avg Score", f"{overall_avg:.1f}", help="Your average mood score across all entries")
+
+                    with col_protect:
+                        if not protective.empty:
+                            best_factor = protective.iloc[0]['Tags']
+                            best_score = protective.iloc[0]['mean']
+                            improvement = overall_avg - best_score
+                            st.metric("Best Helper", f"{best_factor}", f"-{improvement:.1f}", delta_color="inverse", help="Tag with lowest avg score")
+
+                    # Show stressors
+                    if not stressors.empty:
+                        st.markdown("#### ⚠️ 壓力因素 (Stressors)")
+                        st.caption(f"這些標籤出現時，你的分數通常較高（平均 > {overall_avg:.1f}）")
+
+                        fig_stress = px.bar(
+                            stressors,
+                            x="mean",
+                            y="Tags",
+                            orientation='h',
+                            labels={"mean": "Avg Score", "Tags": ""},
+                            text="mean",
+                            color="mean",
+                            color_continuous_scale="Reds"
+                        )
+                        fig_stress.update_traces(texttemplate='%{text:.1f}', textposition='outside')
+                        fig_stress.update_layout(
+                            yaxis={'categoryorder':'total ascending'},
+                            showlegend=False,
+                            height=max(200, len(stressors) * 40)
+                        )
+                        st.plotly_chart(fig_stress, use_container_width=True)
+
+                    # Show protective factors
+                    if not protective.empty:
+                        st.markdown("#### 💚 保護因素 (Protective Factors)")
+                        st.caption(f"這些標籤出現時，你的分數通常較低（平均 ≤ {overall_avg:.1f}）")
+
+                        fig_protect = px.bar(
+                            protective,
+                            x="mean",
+                            y="Tags",
+                            orientation='h',
+                            labels={"mean": "Avg Score", "Tags": ""},
+                            text="mean",
+                            color="mean",
+                            color_continuous_scale="Greens_r"  # Reverse so darker = better
+                        )
+                        fig_protect.update_traces(texttemplate='%{text:.1f}', textposition='outside')
+                        fig_protect.update_layout(
+                            yaxis={'categoryorder':'total descending'},
+                            showlegend=False,
+                            height=max(200, len(protective) * 40)
+                        )
+                        st.plotly_chart(fig_protect, use_container_width=True)
+
+                        # Actionable insight
+                        st.success(f"💡 **洞察**: 試著增加「{protective.iloc[0]['Tags']}」的頻率，這通常能幫助你感覺更好！")
+
                     # Show detail table (optional)
                     with st.expander("See detailed statistics"):
                         st.dataframe(tag_stats.rename(columns={"mean": "Avg Score", "count": "Frequency"}), use_container_width=True)
@@ -290,7 +456,65 @@ def main():
 
                 st.divider()
 
-                # 3. Gratitude Review Section
+                # 3. Medication Adherence Analysis
+                st.subheader("💊 用藥順從性分析 (Medication Adherence)")
+
+                # Check if Medication column exists
+                if 'Medication' in df.columns:
+                    # Filter last 30 days
+                    med_df = df[df['Date'] > (datetime.now() - timedelta(days=30))].copy()
+
+                    if not med_df.empty:
+                        # Calculate adherence rate
+                        total_days = len(med_df)
+                        days_taken = len(med_df[med_df['Medication'] == 'Yes'])
+                        adherence_rate = (days_taken / total_days * 100) if total_days > 0 else 0
+
+                        # Display metrics
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("30天服藥率", f"{adherence_rate:.0f}%")
+                        with col2:
+                            st.metric("已服藥天數", f"{days_taken}/{total_days}")
+                        with col3:
+                            missed_days = total_days - days_taken
+                            st.metric("漏服天數", f"{missed_days}")
+
+                        # Adherence color coding
+                        if adherence_rate >= 80:
+                            st.success("✅ 服藥順從性良好！持續保持。")
+                        elif adherence_rate >= 50:
+                            st.warning("⚠️ 服藥順從性中等。試著設定提醒來提高服藥率。")
+                        else:
+                            st.error("🚨 服藥順從性偏低。建議與醫師討論是否需要調整用藥計畫。")
+
+                        # Correlation: Medication vs Mood Score
+                        if len(med_df[med_df['Medication'] == 'Yes']) > 0 and len(med_df[med_df['Medication'] == 'No']) > 0:
+                            avg_score_taken = med_df[med_df['Medication'] == 'Yes']['Score'].mean()
+                            avg_score_missed = med_df[med_df['Medication'] == 'No']['Score'].mean()
+                            score_diff = avg_score_missed - avg_score_taken
+
+                            st.markdown("#### 用藥對情緒的影響")
+                            col_a, col_b = st.columns(2)
+                            with col_a:
+                                st.metric("有服藥時平均分數", f"{avg_score_taken:.1f}")
+                            with col_b:
+                                st.metric("漏服藥時平均分數", f"{avg_score_missed:.1f}", f"+{score_diff:.1f}" if score_diff > 0 else f"{score_diff:.1f}")
+
+                            if score_diff > 1:
+                                st.info(f"💡 **洞察**: 漏服藥時，你的分數平均高 {score_diff:.1f} 分。規律服藥似乎對你的情緒有幫助。")
+                            elif score_diff < -1:
+                                st.info(f"💡 **洞察**: 有服藥時，你的分數平均高 {abs(score_diff):.1f} 分。建議與醫師討論藥物是否適合。")
+                            else:
+                                st.info("💡 用藥與情緒分數的關聯性不明顯，可能需要更多數據來分析。")
+                    else:
+                        st.info("最近 30 天沒有用藥紀錄。")
+                else:
+                    st.info("用藥追蹤功能已新增！下次記錄時就可以使用了。")
+
+                st.divider()
+
+                # 4. Gratitude Review Section
                 st.subheader("🌟 回顧感恩時刻 (Gratitude Journal)")
 
                 # Check if Gratitude column exists
