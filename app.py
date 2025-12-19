@@ -238,9 +238,41 @@ def main():
         
         st.divider()
 
-        # Medication Adherence Tracker
+        # Medication Adherence Tracker - with initial prompt
         st.markdown("##### 💊 用藥紀錄 (Medication)")
-        med_taken = st.checkbox("✅ 今天有按時服藥", value=True, help="追蹤用藥順從性有助於了解藥物對情緒的影響")
+
+        # Initialize session state for medication usage if not exists
+        if "takes_medication" not in st.session_state:
+            st.session_state.takes_medication = None
+
+        # Ask user if they take medication regularly (only once)
+        if st.session_state.takes_medication is None:
+            st.info("請問您是否有規律服用藥物？（此設定會影響是否顯示用藥追蹤功能）")
+            col_yes, col_no = st.columns(2)
+            with col_yes:
+                if st.button("✅ 是，我有規律服藥", use_container_width=True):
+                    st.session_state.takes_medication = True
+                    st.rerun()
+            with col_no:
+                if st.button("❌ 否，我沒有服藥", use_container_width=True):
+                    st.session_state.takes_medication = False
+                    st.rerun()
+            # Don't show the rest of the form until user answers
+            st.stop()
+
+        # Show medication tracking only if user takes medication
+        if st.session_state.takes_medication:
+            med_taken = st.checkbox("✅ 今天有按時服藥", value=True, help="追蹤用藥順從性有助於了解藥物對情緒的影響")
+        else:
+            # User doesn't take medication, set default value
+            med_taken = None
+
+        # Add option to change medication setting
+        with st.expander("⚙️ 更改用藥設定"):
+            st.caption(f"目前設定: {'有規律服藥' if st.session_state.takes_medication else '沒有服藥'}")
+            if st.button("重新設定用藥選項", key="reset_med"):
+                st.session_state.takes_medication = None
+                st.rerun()
 
         st.divider()
 
@@ -307,8 +339,11 @@ def main():
             else:
                 # Combine gratitude entries with separator
                 gratitude_entries = " | ".join([g for g in [gratitude_1, gratitude_2, gratitude_3] if g.strip()])
-                # Convert medication boolean to string for storage
-                med_status = "Yes" if med_taken else "No"
+                # Convert medication to string for storage (N/A if user doesn't take medication)
+                if med_taken is None:
+                    med_status = "N/A"
+                else:
+                    med_status = "Yes" if med_taken else "No"
                 sheet.append_row([user_email, str(date_val), score, ", ".join(tags), note, gratitude_entries, med_status])
                 st.toast("✅ 紀錄已儲存！", icon="🎉")
                 st.cache_data.clear()
@@ -473,63 +508,67 @@ def main():
 
                 st.divider()
 
-                # 3. Medication Adherence Analysis
-                st.subheader("💊 用藥順從性分析 (Medication Adherence)")
+                # 3. Medication Adherence Analysis - Only show if user takes medication
+                # Check session state to see if user takes medication
+                if st.session_state.get("takes_medication", False):
+                    st.subheader("💊 用藥順從性分析 (Medication Adherence)")
 
-                # Check if Medication column exists
-                if 'Medication' in df.columns:
-                    # Filter last 30 days
-                    med_df = df[df['Date'] > (datetime.now() - timedelta(days=30))].copy()
+                    # Check if Medication column exists
+                    if 'Medication' in df.columns:
+                        # Filter last 30 days and exclude N/A entries
+                        med_df = df[df['Date'] > (datetime.now() - timedelta(days=30))].copy()
+                        med_df = med_df[med_df['Medication'] != 'N/A']
 
-                    if not med_df.empty:
-                        # Calculate adherence rate
-                        total_days = len(med_df)
-                        days_taken = len(med_df[med_df['Medication'] == 'Yes'])
-                        adherence_rate = (days_taken / total_days * 100) if total_days > 0 else 0
+                        if not med_df.empty:
+                            # Calculate adherence rate
+                            total_days = len(med_df)
+                            days_taken = len(med_df[med_df['Medication'] == 'Yes'])
+                            adherence_rate = (days_taken / total_days * 100) if total_days > 0 else 0
 
-                        # Display metrics
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("30天服藥率", f"{adherence_rate:.0f}%")
-                        with col2:
-                            st.metric("已服藥天數", f"{days_taken}/{total_days}")
-                        with col3:
-                            missed_days = total_days - days_taken
-                            st.metric("漏服天數", f"{missed_days}")
+                            # Display metrics
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("30天服藥率", f"{adherence_rate:.0f}%")
+                            with col2:
+                                st.metric("已服藥天數", f"{days_taken}/{total_days}")
+                            with col3:
+                                missed_days = total_days - days_taken
+                                st.metric("漏服天數", f"{missed_days}")
 
-                        # Adherence color coding
-                        if adherence_rate >= 80:
-                            st.success("✅ 服藥順從性良好！持續保持。")
-                        elif adherence_rate >= 50:
-                            st.warning("⚠️ 服藥順從性中等。試著設定提醒來提高服藥率。")
-                        else:
-                            st.error("🚨 服藥順從性偏低。建議與醫師討論是否需要調整用藥計畫。")
-
-                        # Correlation: Medication vs Mood Score
-                        if len(med_df[med_df['Medication'] == 'Yes']) > 0 and len(med_df[med_df['Medication'] == 'No']) > 0:
-                            avg_score_taken = med_df[med_df['Medication'] == 'Yes']['Score'].mean()
-                            avg_score_missed = med_df[med_df['Medication'] == 'No']['Score'].mean()
-                            score_diff = avg_score_missed - avg_score_taken
-
-                            st.markdown("#### 用藥對情緒的影響")
-                            col_a, col_b = st.columns(2)
-                            with col_a:
-                                st.metric("有服藥時平均分數", f"{avg_score_taken:.1f}")
-                            with col_b:
-                                st.metric("漏服藥時平均分數", f"{avg_score_missed:.1f}", f"+{score_diff:.1f}" if score_diff > 0 else f"{score_diff:.1f}")
-
-                            if score_diff > 1:
-                                st.info(f"💡 **洞察**: 漏服藥時，你的分數平均高 {score_diff:.1f} 分。規律服藥似乎對你的情緒有幫助。")
-                            elif score_diff < -1:
-                                st.info(f"💡 **洞察**: 有服藥時，你的分數平均高 {abs(score_diff):.1f} 分。建議與醫師討論藥物是否適合。")
+                            # Adherence color coding
+                            if adherence_rate >= 80:
+                                st.success("✅ 服藥順從性良好！持續保持。")
+                            elif adherence_rate >= 50:
+                                st.warning("⚠️ 服藥順從性中等。試著設定提醒來提高服藥率。")
                             else:
-                                st.info("💡 用藥與情緒分數的關聯性不明顯，可能需要更多數據來分析。")
-                    else:
-                        st.info("最近 30 天沒有用藥紀錄。")
-                else:
-                    st.info("用藥追蹤功能已新增！下次記錄時就可以使用了。")
+                                st.error("🚨 服藥順從性偏低。建議與醫師討論是否需要調整用藥計畫。")
 
-                st.divider()
+                            # Correlation: Medication vs Mood Score
+                            if len(med_df[med_df['Medication'] == 'Yes']) > 0 and len(med_df[med_df['Medication'] == 'No']) > 0:
+                                avg_score_taken = med_df[med_df['Medication'] == 'Yes']['Score'].mean()
+                                avg_score_missed = med_df[med_df['Medication'] == 'No']['Score'].mean()
+                                score_diff = avg_score_missed - avg_score_taken
+
+                                st.markdown("#### 用藥對情緒的影響")
+                                col_a, col_b = st.columns(2)
+                                with col_a:
+                                    st.metric("有服藥時平均分數", f"{avg_score_taken:.1f}")
+                                with col_b:
+                                    st.metric("漏服藥時平均分數", f"{avg_score_missed:.1f}", f"+{score_diff:.1f}" if score_diff > 0 else f"{score_diff:.1f}")
+
+                                if score_diff > 1:
+                                    st.info(f"💡 **洞察**: 漏服藥時，你的分數平均高 {score_diff:.1f} 分。規律服藥似乎對你的情緒有幫助。")
+                                elif score_diff < -1:
+                                    st.info(f"💡 **洞察**: 有服藥時，你的分數平均高 {abs(score_diff):.1f} 分。建議與醫師討論藥物是否適合。")
+                                else:
+                                    st.info("💡 用藥與情緒分數的關聯性不明顯，可能需要更多數據來分析。")
+                        else:
+                            st.info("最近 30 天沒有用藥紀錄。")
+                    else:
+                        st.info("用藥追蹤功能已新增！下次記錄時就可以使用了。")
+
+                    st.divider()
+                # If user doesn't take medication, skip this section entirely
 
                 # 4. Gratitude Review Section
                 st.subheader("🌟 回顧感恩時刻 (Gratitude Journal)")
